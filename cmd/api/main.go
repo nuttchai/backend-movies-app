@@ -1,11 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"time"
 )
 
 const version = "1.0.0"
@@ -21,36 +22,37 @@ type AppStatus struct {
 	Version     string `json:"version"`
 }
 
+// NOTE: we create a new type of application where we'll put the info we need to share with our handler and other components in the application
+type application struct {
+	config config
+	logger *log.Logger
+}
+
 func main() {
 	var cfg config
+	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
 
 	// NOTE: Flag lets you create options when running command-line programs
 	flag.IntVar(&cfg.port, "port", 4000, "Server port to listen on")
 	flag.StringVar(&cfg.env, "env", "development", "Application environment (development|production)")
 	flag.Parse()
 
-	fmt.Println("Running")
+	app := &application{
+		config: cfg,
+		logger: logger,
+	}
 
-	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		currentStatus := AppStatus{
-			Status:      "Available",
-			Environment: cfg.env,
-			Version:     version,
-		}
+	srv := &http.Server{
+		Addr:         fmt.Sprintf(":%d", cfg.port),
+		Handler:      app.routes(),
+		IdleTimeout:  time.Minute,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+	}
 
-		// MarshalIndent's arguments: json, prefix, indent size
-		// In productino, we would use Marshal
-		js, err := json.MarshalIndent(currentStatus, "", "\t")
-		if err != nil {
-			log.Println(err)
-		}
+	logger.Println("Starting server on port", cfg.port)
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(js)
-	})
-
-	err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.port), nil)
+	err := srv.ListenAndServe()
 	if err != nil {
 		log.Println(err)
 	}
