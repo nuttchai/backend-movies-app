@@ -22,30 +22,27 @@ func (app *application) getOneMovie(w http.ResponseWriter, r *http.Request) {
 	movie, err := app.models.DB.Get(id)
 
 	if err != nil {
-		app.logger.Println(err)
 		app.errorJSON(w, err)
 		return
 	}
 
-	// movie := models.Movie{
-	// 	ID:          id,
-	// 	Title:       "The Shawshank Redemption",
-	// 	Description: "Two imprisoned",
-	// 	Year:        1994,
-	// 	ReleaseDate: time.Date(1994, time.January, 14, 0, 0, 0, 0, time.Local),
-	// 	Runtime:     142,
-	// 	Rating:      9,
-	// 	MPAARating:  "R",
-	// 	CreatedAt:   time.Now(),
-	// 	UpdatedAt:   time.Now(),
-	// }
-
 	err = app.writeJSON(w, http.StatusOK, movie, "movie")
 	if err != nil {
-		app.logger.Println(err)
+		app.errorJSON(w, err)
+		return
 	}
 }
 
 func (app *application) getAllMovies(w http.ResponseWriter, r *http.Request) {
+	movies, err := app.models.DB.GetAll()
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
 
+	err = app.writeJSON(w, http.StatusOK, movies, "movies")
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
 }

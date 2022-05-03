@@ -79,6 +79,68 @@ func (m *DBModel) Get(id int) (*Movie, error) {
 }
 
 // All returns all movies and error, if any
-func (m *DBModel) All(id int) ([]*Movie, error) {
-	return nil, nil
+func (m *DBModel) GetAll() ([]*Movie, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel() // NOTE: if thing go wrong, it will be canceled
+
+	query := `select id, title, description, year, release_date, 
+		runtime, rating, mpaa_rating, created_at, updated_at from movies order by title`
+
+	rows, err := m.DB.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() // NOTE: close the rows after we finish using it
+
+	var movies []*Movie
+
+	for rows.Next() {
+		var movie Movie
+		err := rows.Scan(
+			&movie.ID,
+			&movie.Title,
+			&movie.Description,
+			&movie.Year,
+			&movie.ReleaseDate,
+			&movie.Runtime,
+			&movie.Rating,
+			&movie.MPAARating,
+			&movie.CreatedAt,
+			&movie.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Get the genres of the movie
+		genreQuery := `select 
+										mg.id, mg.movie_id, mg.genre_id, g.genre_name
+									from 
+										movies_genres mg
+										left join genres g on (g.id = mg.genre_id)
+									where mg.movie_id = $1`
+
+		genreRows, _ := m.DB.QueryContext(ctx, genreQuery, movie.ID)
+
+		genres := make(map[int]string)
+		for genreRows.Next() {
+			var mg MovieGenre
+			err := genreRows.Scan(
+				&mg.ID,
+				&mg.MovieID,
+				&mg.GenreID,
+				&mg.Genre.GenreName,
+			)
+			if err != nil {
+				return nil, err
+			}
+			genres[mg.ID] = mg.Genre.GenreName
+		}
+		defer genreRows.Close() // NOTE: close the rows after we finish using it
+
+		movie.MovieGenre = genres
+		movies = append(movies, &movie)
+	}
+
+	return movies, nil
 }
